@@ -10,69 +10,84 @@ exports.handler = async (event, context) => {
   const accountID = process.env.ACCOUNT_ID
   const cfURL = process.env.CLOUDFRONT_DOMAIN_NAME
 
-  async function getRecordings() {
-    const params = {
-      Bucket: process.env.STORAGE_IVSRECORDINGS_BUCKETNAME,
-      Prefix: `ivs/v1/${accountID}/`,
-      MaxKeys: 1000 // Limit to 1000 recordings
+  async function listPrefixes(bucket, prefix) {
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      Delimiter: '/'
+    })
+  
+    const { CommonPrefixes = [] } = await s3Client.send(command)
+    console.log(`[ListPrefixes] Found ${CommonPrefixes.length} prefixes under: ${prefix}`)
+    return CommonPrefixes.map(cp => cp.Prefix)
+  }
+  
+  async function getRecordings(channelFilter, dateFilter) {
+    if (!channelFilter || !dateFilter) {
+      console.error('Both channelFilter and dateFilter are required')
+      return []
     }
+  
+    const [year, monthRaw, dayRaw] = dateFilter.split('-')
+    const month = String(parseInt(monthRaw, 10))
+    const day = String(parseInt(dayRaw, 10))
+  
+    const basePrefix = `ivs/v1/${accountID}/${channelFilter}/${year}/${month}/${day}/`
+    const bucket = process.env.STORAGE_IVSRECORDINGS_BUCKETNAME
     const vodData = []
-    let continuationToken = undefined
-
+  
     try {
-      do {
-        if (continuationToken) {
-          params.ContinuationToken = continuationToken
-        }
-
-        const command = new ListObjectsV2Command(params)
-        const recordings = await s3Client.send(command)
-
-        if (!recordings?.Contents) {
-          break
-        }
-
-        console.log('Recordings Found:', recordings.Contents.length)
-
-        // Filter for master.m3u8 files and process them
-        const masterFiles = recordings.Contents.filter((recording) =>
-          recording.Key.endsWith('/master.m3u8')
-        )
-
-        for (const recording of masterFiles) {
-          console.log('Found Master Manifest:', recording.Key)
-          const s3pathParsed = recording.Key.split('/')
-          const pathLength = s3pathParsed.length
-
-          // Only process if we have enough path segments
-          if (pathLength >= 10) {
-            let assetName = `Channel: ${s3pathParsed[3]} - Date: ${s3pathParsed[4]}-${s3pathParsed[5]}-${s3pathParsed[6]} ${s3pathParsed[7]}:${s3pathParsed[8]} - ID: ${s3pathParsed[9]}`
-            vodData.push({
-              channel: s3pathParsed[3],
-              year: s3pathParsed[4],
-              month: s3pathParsed[5],
-              day: s3pathParsed[6],
-              hour: s3pathParsed[7],
-              minute: s3pathParsed[8],
-              recording: s3pathParsed[9],
-              assetID: assetName,
-              path: s3pathParsed.slice(0, pathLength - 1).join('/'),
-              master: `${cfURL}/${recording.Key}`
+      const hourPrefixes = await listPrefixes(bucket, basePrefix)
+  
+      for (const hourPrefix of hourPrefixes) {
+        const minutePrefixes = await listPrefixes(bucket, hourPrefix)
+  
+        for (const minutePrefix of minutePrefixes) {
+          const recordingPrefixes = await listPrefixes(bucket, minutePrefix)
+  
+          for (const recordingPrefix of recordingPrefixes) {
+            const command = new ListObjectsV2Command({
+              Bucket: bucket,
+              Prefix: recordingPrefix + "media/hls/master.m3u8",
             })
+  
+            const { Contents = [] } = await s3Client.send(command)
+            const masterFile = Contents.find(({ Key }) => Key.endsWith('/master.m3u8'))
+  
+            if (masterFile) {
+              const segments = masterFile.Key.split('/')
+              const [ , , , channel, year, month, day, hour, minute, recordingId ] = segments
+  
+              vodData.push({
+                channel,
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                recording: recordingId,
+                assetID: `Channel: ${channel} - Date: ${year}-${month}-${day} ${hour}:${minute} - ID: ${recordingId}`,
+                path: segments.slice(0, -1).join('/'),
+                master: `${cfURL}/${masterFile.Key}`
+              })
+  
+              console.log('Found master manifest at:', masterFile.Key)
+            }
           }
         }
-
-        continuationToken = recordings.NextContinuationToken
-      } while (continuationToken)
-
+      }
+  
       return vodData
+  
     } catch (error) {
       console.error('Error fetching recordings:', error)
       return []
     }
   }
 
-  const vodData = await getRecordings()
+  const channelFilter = event.queryStringParameters?.channel
+  const dateFilter = event.queryStringParameters?.date
+  const vodData = await getRecordings(channelFilter, dateFilter)
   console.log('Total recordings found:', vodData.length)
 
   const response = {
