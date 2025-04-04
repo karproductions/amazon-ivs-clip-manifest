@@ -15,7 +15,8 @@ exports.handler = async (event, context) => {
   async function getClips() {
     const params = {
       Bucket: process.env.STORAGE_IVSRECORDINGS_BUCKETNAME,
-      Prefix: `${vodPath.vod}/`
+      Prefix: `${vodPath.vod}/`,
+      Delimiter: '/'
     }
     try {
       const command = new ListObjectsCommand(params)
