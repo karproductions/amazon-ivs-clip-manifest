@@ -2,6 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 Description: Amazon IVS Clip Manisfest
 
+Parameters:
+  IVSRecordingBucketName:
+    Type: String
+    Description: "Optional. Specify an existing S3 bucket name for IVS recordings. Leave blank to create a new bucket."
+    Default: ""
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -9,9 +15,12 @@ Globals:
     MemorySize: 128
     Environment:
       Variables:
-        STORAGE_IVSRECORDINGS_BUCKETNAME: !Ref IVSRecordingBucket
+        STORAGE_IVSRECORDINGS_BUCKETNAME: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
         CLOUDFRONT_DOMAIN_NAME: !Sub "https://${CloudfrontDistribution.DomainName}"
         ACCOUNT_ID: !Ref AWS::AccountId
+
+Conditions:
+  CreateIVSRecordingBucket: !Equals [!Ref IVSRecordingBucketName, ""]
 
 Resources:
   # Post create clips API
@@ -22,7 +31,7 @@ Resources:
       CodeUri: lambdas/clipmanifest
       Policies:
         - S3CrudPolicy:
-            BucketName: !Ref IVSRecordingBucket
+            BucketName: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
       Events:
         Api1:
           Type: Api
@@ -37,7 +46,7 @@ Resources:
       CodeUri: lambdas/getrecordings
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref IVSRecordingBucket
+            BucketName: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
       Events:
         Api1:
           Type: Api
@@ -52,7 +61,7 @@ Resources:
       CodeUri: lambdas/getclips
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref IVSRecordingBucket
+            BucketName: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
       Events:
         Api1:
           Type: Api
@@ -77,7 +86,7 @@ Resources:
         # List of origins that Cloudfront will connect to
         Origins:
           - Id: s3-website
-            DomainName: !GetAtt IVSRecordingBucket.DomainName
+            DomainName: !If [CreateIVSRecordingBucket, !GetAtt IVSRecordingBucket.DomainName, !Sub "${IVSRecordingBucketName}.s3.amazonaws.com"]
             S3OriginConfig:
               # Restricting Bucket access through an origin access identity
               OriginAccessIdentity: 
@@ -99,6 +108,7 @@ Resources:
   ## Create S3 Bucket
   IVSRecordingBucket:
     Type: AWS::S3::Bucket
+    Condition: CreateIVSRecordingBucket
     Properties:
       # Change bucket name if you want to have a custom name
       BucketName: !Sub "my-new-ivs-recording-bucket-ui-${AWS::AccountId}" ## add account is !GetAtt AWS::AccountId
@@ -123,7 +133,7 @@ Resources:
   IVSRecordingBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref IVSRecordingBucket
+      Bucket: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
       PolicyDocument:
       # Restricting access to cloudfront only.
         Statement:
@@ -131,7 +141,10 @@ Resources:
             Effect: Allow
             Action: 's3:GetObject'
             Resource:
-              - !Sub "arn:aws:s3:::${IVSRecordingBucket}/*"
+              - !If 
+                - CreateIVSRecordingBucket
+                - !Sub "arn:aws:s3:::${IVSRecordingBucket}/*"
+                - !Sub "arn:aws:s3:::${IVSRecordingBucketName}/*"
             Principal:
               AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginAccessIdentity}"
 
@@ -147,7 +160,7 @@ Outputs:
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/clipmanifest/" 
   RecordConfigurationBucket:
     Description: "Recoding Bucket Name"
-    Value: !Ref IVSRecordingBucket
+    Value: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
   CloudfrontDistribution:
     Description: "Amazon CloudFront Domain Name"
     Value: !Sub "https://${CloudfrontDistribution.DomainName}"
