@@ -7,14 +7,27 @@ exports.handler = async (event) => {
     const command = new ListChannelsCommand({});
     const response = await client.send(command);
 
+    const simplifiedChannels = response.channels.map(channel => ({
+      id: channel.arn.split('/').pop(),
+      name: channel.name
+    }));
+
     return {
       statusCode: 200,
-      body: JSON.stringify(response.channels),
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*'
+      },
+      body: JSON.stringify(simplifiedChannels),
     };
   } catch (error) {
     console.error('Error listing IVS channels:', error);
     return {
       statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*'
+      },
       body: JSON.stringify({ message: 'Failed to list IVS channels', error: error.message }),
     };
   }
