@@ -68,6 +68,20 @@ Resources:
           Properties:
             Path: /getclips
             Method: GET 
+  # Get channels API
+  GetChannelsLambda:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      CodeUri: lambdas/getchannels
+      Policies:
+        - IVSReadOnlyAccess
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: /getchannels
+            Method: GET
   ## CloudFront Block
   CloudFrontOriginAccessIdentity:
     Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
@@ -158,6 +172,9 @@ Outputs:
   ApiURLCreateClip:
     Description: "API endpoint post create clips"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/clipmanifest/" 
+  ApiURLGetChannels:
+    Description: "API endpoint to get channels"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/getchannels/"
   RecordConfigurationBucket:
     Description: "Recoding Bucket Name"
     Value: !If [CreateIVSRecordingBucket, !Ref IVSRecordingBucket, !Ref IVSRecordingBucketName]
