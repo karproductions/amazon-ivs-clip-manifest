@@ -28,6 +28,9 @@ function HomePageContent() {
   const [listofRec, setListofRec] = useState([])
   const [listofClips, setListofClips] = useState([])
 
+  const [channel, setChannel] = useState('')
+  const [date, setDate] = useState('')
+
   // Get debug context
   const { addDebugLine } = useDebug()
 
@@ -39,8 +42,6 @@ function HomePageContent() {
   })
 
   useEffect(() => {
-    if (!vodData.url) handleRecodingData()
-
     if (loaded && playerRef.current) {
       const timeUpdateHandler = () => {
         setPosition(playerRef.current?.currentTime() || 0)
@@ -72,7 +73,7 @@ function HomePageContent() {
   const handleRecodingData = async () => {
     try {
       addDebugLine(Date.now(), 'Fetching available recordings...')
-      const items = await getRecordingsAPI()
+      const items = await getRecordingsAPI(channel, date)
       setListofRec(items)
 
       if (items?.length > 0) {
@@ -225,20 +226,50 @@ function HomePageContent() {
   return (
     <div className='Home'>
       <div className='page-container'>
-        <div className='selector-container'>
-          <select
-            value={vodData.url}
-            className='vod-select'
-            required
-            onChange={handleVODChange}
-          >
-            {listofRec.map((item, index) => (
-              <option key={index} value={item.master} data-path={item.path}>
-                Select the VOD: {item.assetID}
-              </option>
-            ))}
-          </select>
-        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleRecodingData()
+          }}
+        >
+          <div className='selector-container'>
+            <div className="mb-3 d-flex flex-column flex-md-row align-items-center gap-3">
+              <input
+                className='form-control'
+                type='text'
+                placeholder='Enter Channel'
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                required
+              />
+              <input
+                className='form-control'
+                type='date'
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+              <button
+                type='submit'
+                className='btn btn-primary w-100 w-md-auto'
+              >
+                Fetch&nbsp;Recordings
+              </button>
+            </div>
+          </div>
+        </form>
+        <select
+          value={vodData.url}
+          className='vod-select'
+          required
+          onChange={handleVODChange}
+        >
+          {listofRec.map((item, index) => (
+            <option key={index} value={item.master} data-path={item.path}>
+              Select the VOD: {item.assetID}
+            </option>
+          ))}
+        </select>
 
         <div className='video-container'>
           {vodData.url ? (
