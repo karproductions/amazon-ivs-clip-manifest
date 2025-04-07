@@ -22,7 +22,7 @@ export default function App(props) {
   return (
     <div className='App'>
       <nav className='navbar navbar-dark bg-dark'>
-        <a class='navbar-brand align' href='#'>
+        <a className='navbar-brand align' href='#'>
           IVS Manifest Clipping
         </a>
         <button
