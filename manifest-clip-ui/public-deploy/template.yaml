@@ -21,7 +21,7 @@ Resources:
         # List of origins that Cloudfront will connect to
         Origins:
           - Id: s3-website
-            DomainName: !GetAtt S3Bucket.DomainName
+            DomainName: !Sub "${S3Bucket}.s3.amazonaws.com"
             S3OriginConfig:
               # Restricting Bucket access through an origin access identity
               OriginAccessIdentity: 
@@ -43,7 +43,7 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       # Change bucket name to reflect your website
-      BucketName: !Sub "hosting-ivs-manifest-clip${AWS::AccountId}"
+      BucketName: !Sub "kar-clip-manifest-ui"
 
   S3BucketPolicy:
     Type: AWS::S3::BucketPolicy
