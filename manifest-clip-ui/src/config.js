@@ -5,6 +5,7 @@ function getAPIValues(key) {
   return config[0][index].OutputValue
 }
 
+export const GET_CHANNELS_API = getAPIValues('ApiURLGetChannels')
 export const GET_RECORDING_API = getAPIValues('ApiURLGetRecordings')
 export const GET_CLIPS_API = getAPIValues('ApiURLGetClips')
 export const POST_CLIPMANIFEST_API = getAPIValues('ApiURLCreateClip')

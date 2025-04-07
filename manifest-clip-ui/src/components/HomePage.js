@@ -13,6 +13,7 @@ import ClipControls from './ClipControls'
 import ClipsGallery from './ClipsGallery'
 import { createClipAPI } from './apis/createClip'
 import ClipPlayerModal from './player/ClipPlayerModal'
+import { getChannelsAPI } from './apis/getChannels'
 
 // Wrap the main component to use debug context
 function HomePageContent() {
@@ -30,6 +31,7 @@ function HomePageContent() {
 
   const [channel, setChannel] = useState('')
   const [date, setDate] = useState('')
+  const [channels, setChannels] = useState([])
 
   // Get debug context
   const { addDebugLine } = useDebug()
@@ -40,6 +42,23 @@ function HomePageContent() {
     id: '',
     clipData: null
   })
+
+  useEffect(() => {
+    const fetchChannels = async () => {
+      try {
+        addDebugLine(Date.now(), 'Fetching available channels...')
+        const channelList = await getChannelsAPI()
+        addDebugLine(Date.now(), `Fetched ${channelList.length} channels`)
+        setChannels(channelList)
+      } catch (error) {
+        console.error('Error fetching channels:', error)
+        addDebugLine(Date.now(), `Error loading channels: ${error.message}`)
+        setChannels([])
+      }
+    }
+
+    fetchChannels()
+  }, []) // Ensure this effect runs only once on component mount
 
   useEffect(() => {
     if (loaded && playerRef.current) {
@@ -226,22 +245,27 @@ function HomePageContent() {
   return (
     <div className='Home'>
       <div className='page-container'>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            handleRecodingData()
-          }}
-        >
-          <div className='selector-container'>
+        <div className='selector-container'>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleRecodingData()
+            }}
+          >
             <div className="mb-3 d-flex flex-column flex-md-row align-items-center gap-3">
-              <input
+              <select
                 className='form-control'
-                type='text'
-                placeholder='Enter Channel'
                 value={channel}
                 onChange={(e) => setChannel(e.target.value)}
                 required
-              />
+              >
+                <option value='' disabled>Select Channel</option>
+                {channels.map((ch, index) => (
+                  <option key={index} value={ch.id}>
+                    {ch.name}
+                  </option>
+                ))}
+              </select>
               <input
                 className='form-control'
                 type='date'
@@ -256,20 +280,20 @@ function HomePageContent() {
                 Fetch&nbsp;Recordings
               </button>
             </div>
-          </div>
-        </form>
-        <select
-          value={vodData.url}
-          className='vod-select'
-          required
-          onChange={handleVODChange}
-        >
-          {listofRec.map((item, index) => (
-            <option key={index} value={item.master} data-path={item.path}>
-              Select the VOD: {item.assetID}
-            </option>
-          ))}
-        </select>
+          </form>
+          <select
+            value={vodData.url}
+            className='vod-select'
+            required
+            onChange={handleVODChange}
+          >
+            {listofRec.map((item, index) => (
+              <option key={index} value={item.master} data-path={item.path}>
+                Select the VOD: {item.assetID}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className='video-container'>
           {vodData.url ? (

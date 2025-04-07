@@ -4,7 +4,7 @@
 import { GET_RECORDING_API } from '../../config'
 
 export function getRecordingsAPI(channel, date) {
-  console.log('get Recordings', GET_RECORDING_API, channel, typeof(date));
+  console.log('get Recordings', GET_RECORDING_API, channel, date);
 
   // Format date as ISO YYYY-MM-DD
   const formattedDate = new Date(date).toISOString().split('T')[0];
